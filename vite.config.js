@@ -1,36 +1,21 @@
 import { defineConfig } from "vite";
-import path from "path";
-import fs from "fs";
-
-function getHtmlEntryFiles(srcDir) {
-  const entry = {};
-
-  function traverseDir(currentDir) {
-    const files = fs.readdirSync(currentDir);
-
-    files.forEach(file => {
-      const filePath = path.join(currentDir, file);
-      const isDirectory = fs.statSync(filePath).isDirectory();
-
-      if (isDirectory) {
-        traverseDir(filePath);
-      } else if (path.extname(file) === ".html") {
-        const name = path.relative(srcDir, filePath).replace(/\..*$/, "");
-        entry[name] = filePath;
-      }
-    });
-  }
-
-  traverseDir(srcDir);
-  console.log(entry);
-  return entry;
-}
+import { globSync } from "glob";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   root: "src",
   build: {
     rollupOptions: {
-      input: getHtmlEntryFiles("src"),
+      input: Object.fromEntries(
+        globSync("src/**/*.html").map(file => [
+          path.relative(
+            "src",
+            file.slice(0, file.length - path.extname(file).length)
+          ),
+          fileURLToPath(new URL(file, import.meta.url)),
+        ])
+      ),
     },
     outDir: "../dist",
     emptyOutDir: true,
@@ -39,3 +24,19 @@ export default defineConfig({
     entries: "src/**/*{.html,.css,.js}",
   },
 });
+
+console.log(
+  Object.fromEntries(
+    globSync("src/**/*.html").map(file => [
+      // This remove `src/` as well as the file extension from each
+      // file, so e.g. src/nested/foo.js becomes nested/foo
+      path.relative(
+        "src",
+        file.slice(0, file.length - path.extname(file).length)
+      ),
+      // This expands the relative paths to absolute paths, so e.g.
+      // src/nested/foo becomes /project/src/nested/foo.js
+      fileURLToPath(new URL(file, import.meta.url)),
+    ])
+  )
+);
